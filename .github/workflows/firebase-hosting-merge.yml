@@ -18,3 +18,4 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_AI_RESUME_ANALYZER_5BB5F }}
           channelId: live
           projectId: ai-resume-analyzer-5bb5f
+          entryPoint: client
