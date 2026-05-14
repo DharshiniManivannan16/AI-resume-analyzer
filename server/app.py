@@ -1,5 +1,6 @@
-from flask import Flask
+from flask import Flask, request, jsonify
 from flask_cors import CORS
+import pdfplumber
 import os
 
 app = Flask(__name__)
