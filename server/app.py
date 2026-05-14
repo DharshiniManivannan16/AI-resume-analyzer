@@ -6,18 +6,8 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-@app.route("/")
-def home():
-    return "Backend Running"
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
-
-app = Flask(__name__)
-CORS(app)
-
 # ---------------- JOB SKILLS ----------------
+
 job_roles = {
     "Data Analyst": ["python", "sql", "excel", "power bi", "data analysis"],
     "Data Scientist": ["python", "machine learning", "pandas", "numpy", "sql"],
@@ -25,7 +15,14 @@ job_roles = {
     "Data Engineer": ["python", "sql", "spark", "etl", "mongodb"]
 }
 
+# ---------------- HOME ----------------
+
+@app.route("/")
+def home():
+    return "Backend Running"
+
 # ---------------- ATS ----------------
+
 def calculate_ats(text, role):
 
     text = text.lower()
@@ -45,8 +42,10 @@ def calculate_ats(text, role):
 
     if "project" in text:
         score += 5
+
     if "experience" in text:
         score += 5
+
     if len(text) > 800:
         score += 10
 
@@ -55,8 +54,8 @@ def calculate_ats(text, role):
 
     return score, found, missing
 
-
 # ---------------- JOB RECOMMENDATION ----------------
+
 def recommend_jobs(text):
 
     text = text.lower()
@@ -89,8 +88,8 @@ def recommend_jobs(text):
 
     return result
 
+# ---------------- AI Suggestions ----------------
 
-# ---------------- AI SUGGESTIONS ----------------
 def ai_suggestions(missing):
 
     return [
@@ -98,8 +97,8 @@ def ai_suggestions(missing):
         for skill in missing
     ]
 
+# ---------------- Upload Resume ----------------
 
-# ---------------- ROUTE ----------------
 @app.route("/upload-resume", methods=["POST"])
 def upload_resume():
 
@@ -109,14 +108,18 @@ def upload_resume():
         role = request.form.get("role", "Data Scientist")
 
         if not file:
-            return jsonify({"error": "No file"}), 400
+            return jsonify({"error": "No file uploaded"}), 400
 
         text = ""
 
         if file.filename.endswith(".pdf"):
+
             with pdfplumber.open(file) as pdf:
+
                 for p in pdf.pages:
+
                     t = p.extract_text()
+
                     if t:
                         text += t
 
@@ -139,8 +142,15 @@ def upload_resume():
         })
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+# ---------------- MAIN ----------------
 
 if __name__ == "__main__":
-    app.run(debug=True)
+
+    port = int(os.environ.get("PORT", 5000))
+
+    app.run(host="0.0.0.0", port=port)
