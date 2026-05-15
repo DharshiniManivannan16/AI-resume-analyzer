@@ -1,156 +1,371 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pdfplumber
+import requests
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-# ---------------- JOB SKILLS ----------------
+# ---------------- OPENROUTER API KEY ----------------
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+print("API KEY LOADED:", OPENROUTER_API_KEY)
 
-job_roles = {
-    "Data Analyst": ["python", "sql", "excel", "power bi", "data analysis"],
-    "Data Scientist": ["python", "machine learning", "pandas", "numpy", "sql"],
-    "Web Developer": ["html", "css", "javascript", "react", "node js"],
-    "Data Engineer": ["python", "sql", "spark", "etl", "mongodb"]
-}
+# ---------------- FREE AI MODEL ----------------
+AI_MODEL = "openai/gpt-3.5-turbo"
 
 # ---------------- HOME ----------------
-
 @app.route("/")
 def home():
-    return "Backend Running"
+    return "🔥 AI Resume Analyzer Backend Running"
 
-# ---------------- ATS ----------------
+# ---------------- CHATBOT ----------------
+@app.route("/chat", methods=["POST"])
+def chat():
 
-def calculate_ats(text, role):
+    try:
 
-    text = text.lower()
-    role_skills = job_roles.get(role, [])
+        data = request.get_json()
 
-    found = []
-    missing = []
+        user_message = data.get("message", "")
 
-    score = 0
+        response = requests.post(
 
-    for s in role_skills:
-        if s in text:
-            found.append(s)
-            score += 20
-        else:
-            missing.append(s)
+            url="https://openrouter.ai/api/v1/chat/completions",
 
-    if "project" in text:
-        score += 5
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "http://localhost:5173",
+                "X-Title": "AI Resume Analyzer"
+            },
 
-    if "experience" in text:
-        score += 5
+            json={
 
-    if len(text) > 800:
-        score += 10
+                "model": AI_MODEL,
 
-    if score > 100:
-        score = 100
+                "messages": [
 
-    return score, found, missing
+                    {
+                        "role": "system",
+                        "content": """
+You are a professional AI Resume Analyzer Assistant.
 
-# ---------------- JOB RECOMMENDATION ----------------
+Help users with:
+- ATS score improvement
+- Resume optimization
+- Skills improvement
+- Career guidance
+- Interview preparation
+- Resume formatting
 
-def recommend_jobs(text):
+Keep responses:
+- Professional
+- Short
+- Helpful
+- Modern
+"""
+                    },
 
-    text = text.lower()
+                    {
+                        "role": "user",
+                        "content": user_message
+                    }
 
-    jobs = {
-        "Data Analyst": ["python", "sql", "excel", "power bi"],
-        "Data Scientist": ["python", "machine learning", "pandas"],
-        "Web Developer": ["html", "css", "javascript", "react"],
-        "Data Engineer": ["spark", "etl", "sql"]
-    }
+                ],
 
-    result = []
+                "temperature": 0.7
 
-    for job, skills in jobs.items():
+            }
 
-        match = 0
+        )
 
-        for s in skills:
-            if s in text:
-                match += 1
+        result = response.json()
 
-        score = int((match / len(skills)) * 100)
+        print(result)
 
-        if score >= 30:
-            result.append({
-                "role": job,
-                "match": score,
-                "skills": skills
-            })
+        if "choices" not in result:
 
-    return result
+            return jsonify({
+                "reply": "❌ AI Server Error"
+            }), 500
 
-# ---------------- AI Suggestions ----------------
+        reply = result["choices"][0]["message"]["content"]
 
-def ai_suggestions(missing):
+        return jsonify({
+            "reply": reply
+        })
 
-    return [
-        f"Learn {skill} and build a small project"
-        for skill in missing
-    ]
+    except Exception as e:
 
-# ---------------- Upload Resume ----------------
+        print(e)
 
+        return jsonify({
+            "reply": f"AI Server Error: {str(e)}"
+        }), 500
+
+# ---------------- RESUME UPLOAD ----------------
 @app.route("/upload-resume", methods=["POST"])
 def upload_resume():
 
     try:
 
         file = request.files.get("resume")
-        role = request.form.get("role", "Data Scientist")
 
         if not file:
-            return jsonify({"error": "No file uploaded"}), 400
+            return jsonify({
+                "error": "No file uploaded"
+            }), 400
 
         text = ""
 
+        # PDF TEXT EXTRACTION
         if file.filename.endswith(".pdf"):
 
             with pdfplumber.open(file) as pdf:
 
-                for p in pdf.pages:
+                for page in pdf.pages:
 
-                    t = p.extract_text()
+                    page_text = page.extract_text()
 
-                    if t:
-                        text += t
+                    if page_text:
+                        text += page_text
 
-        if text.strip() == "":
-            text = "No text extracted"
+        text_lower = text.lower()
 
-        ats, found, missing = calculate_ats(text, role)
+        # ---------------- SKILLS ----------------
 
-        jobs = recommend_jobs(text)
+        check_skills = [
 
-        suggestions = ai_suggestions(missing)
+            "python",
+            "react",
+            "javascript",
+            "sql",
+            "machine learning",
+            "html",
+            "css",
+            "flask",
+            "firebase",
+            "node",
+            "mongodb",
+            "tailwind",
+            "java",
+            "c++"
+
+        ]
+
+        skills = []
+        missing = []
+
+        for skill in check_skills:
+
+            if skill in text_lower:
+                skills.append(skill)
+
+            else:
+                missing.append(skill)
+
+        # ---------------- ATS SCORE ----------------
+
+        score = int((len(skills) / len(check_skills)) * 100)
+
+        # ---------------- JOBS ----------------
+
+        jobs = []
+
+        if "python" in skills:
+
+            jobs.append({
+
+                "role": "Python Developer",
+                "match": 92,
+                "skills": ["Python", "Flask"]
+
+            })
+
+        if "react" in skills:
+
+            jobs.append({
+
+                "role": "Frontend Developer",
+                "match": 88,
+                "skills": ["React", "JavaScript"]
+
+            })
+
+        if "machine learning" in skills:
+
+            jobs.append({
+
+                "role": "AI Engineer",
+                "match": 96,
+                "skills": ["Machine Learning", "Python"]
+
+            })
+
+        if "firebase" in skills:
+
+            jobs.append({
+
+                "role": "Firebase Developer",
+                "match": 85,
+                "skills": ["Firebase", "React"]
+
+            })
+
+        if len(jobs) == 0:
+
+            jobs.append({
+
+                "role": "Software Developer",
+                "match": 70,
+                "skills": ["Programming"]
+
+            })
+
+        # ---------------- SUGGESTIONS ----------------
+
+        suggestions = []
+
+        if score < 50:
+
+            suggestions.append("Add more technical skills")
+            suggestions.append("Add more real-world projects")
+            suggestions.append("Improve ATS keywords")
+            suggestions.append("Add certifications")
+
+        if "github" not in text_lower:
+            suggestions.append("Add GitHub profile")
+
+        if "linkedin" not in text_lower:
+            suggestions.append("Add LinkedIn profile")
+
+        if "project" not in text_lower:
+            suggestions.append("Add project section")
+
+        if len(suggestions) == 0:
+
+            suggestions.append("Excellent ATS Resume")
+            suggestions.append("Resume looks professional")
+
+        # ---------------- FINAL RESPONSE ----------------
 
         return jsonify({
-            "resume_text": text,
-            "ats_score": ats,
-            "skills": found,
+
+            "resume_text": text[:2000],
+
+            "ats_score": score,
+
+            "skills": skills,
+
             "missing_skills": missing,
+
             "recommended_jobs": jobs,
+
             "suggestions": suggestions
+
         })
 
     except Exception as e:
+
+        print(e)
 
         return jsonify({
             "error": str(e)
         }), 500
 
-# ---------------- MAIN ----------------
+# ---------------- AI RESUME REWRITE ----------------
+@app.route("/rewrite", methods=["POST"])
+def rewrite_resume():
 
+    try:
+
+        data = request.get_json()
+
+        content = data.get("content", "")
+        rewrite_type = data.get("type", "")
+
+        prompt = f"""
+You are a professional ATS resume expert.
+
+Rewrite this {rewrite_type} professionally.
+
+Content:
+{content}
+
+Requirements:
+- ATS optimized
+- Professional
+- Strong action words
+- Modern resume style
+- Better readability
+"""
+
+        response = requests.post(
+
+            url="https://openrouter.ai/api/v1/chat/completions",
+
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "http://localhost:5173",
+                "X-Title": "AI Resume Analyzer"
+            },
+
+            json={
+
+                "model": AI_MODEL,
+
+                "messages": [
+
+                    {
+                        "role": "system",
+                        "content": """
+You are a professional resume rewriting assistant.
+Rewrite resumes professionally with ATS optimization.
+"""
+                    },
+
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+
+                ],
+
+                "temperature": 0.7
+
+            }
+
+        )
+
+        result = response.json()
+
+        print(result)
+
+        if "choices" not in result:
+
+            return jsonify({
+                "error": "AI Rewrite Failed"
+            }), 500
+
+        answer = result["choices"][0]["message"]["content"]
+
+        return jsonify({
+            "result": answer
+        })
+
+    except Exception as e:
+
+        print(e)
+
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+# ---------------- RUN SERVER ----------------
 if __name__ == "__main__":
-
-    port = int(os.environ.get("PORT", 5000))
-
-    app.run(host="0.0.0.0", port=port)
+    app.run(debug=True)
